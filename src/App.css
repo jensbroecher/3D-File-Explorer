@@ -12,11 +12,20 @@
   flex-direction: column;
   z-index: 10;
   height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.full-width {
+  width: 100vw;
+  min-width: 100vw;
 }
 
 .sidebar-header {
   padding: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .logo-area {
@@ -41,6 +50,13 @@
   gap: 4px;
 }
 
+.file-list.grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
 .file-item {
   display: flex;
   align-items: center;
@@ -51,6 +67,32 @@
   transition: all 0.2s;
   color: rgba(255, 255, 255, 0.7);
   border: 1px solid transparent;
+}
+
+.file-item.grid-item {
+  flex-direction: column;
+  padding: 8px;
+  gap: 8px;
+  justify-content: center;
+  text-align: center;
+}
+
+.thumbnail-container {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .file-item:hover {
@@ -173,4 +215,35 @@
   border: 1px solid rgba(239, 68, 68, 0.2);
   margin: 16px;
   font-size: 0.9rem;
+}
+
+.view-toggles {
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toggle-btn.active {
+  color: white;
+  background: rgba(99, 102, 241, 0.3);
 }

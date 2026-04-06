@@ -8,6 +8,7 @@ import { GLTFLoader } from 'three-stdlib';
 import { FBXLoader } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { STLLoader } from 'three-stdlib';
+import { DRACOLoader } from 'three-stdlib';
 
 const Model = ({ url, extension }) => {
   let loader;
@@ -23,7 +24,13 @@ const Model = ({ url, extension }) => {
     throw new Error(`Unsupported extension: ${extension}`);
   }
 
-  const result = useLoader(loader, url);
+  const result = useLoader(loader, url, (loaderInst) => {
+    if (extension === 'glb' || extension === 'gltf') {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      loaderInst.setDRACOLoader(dracoLoader);
+    }
+  });
   
   if (extension === 'stl') {
     return (
@@ -63,8 +70,8 @@ export default function Viewer({ file }) {
             <color attach="background" args={['transparent']} />
             <Sky sunPosition={[100, 20, 100]} turbidity={0.1} rayleigh={0.5} />
             <Environment preset="city" />
-            <ambientLight intensity={1.5} />
-            <directionalLight position={[10, 10, 10]} castShadow intensity={2} shadow-bias={-0.0001} />
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 10]} castShadow intensity={1} shadow-bias={-0.0001} />
             <Bounds fit clip observe margin={1.2}>
               <Center>
                 <Model url={file.url} extension={file.extension} />

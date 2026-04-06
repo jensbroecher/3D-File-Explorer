@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
-import { FolderOpen, Box, FileBox, LayoutGrid } from 'lucide-react';
+import { FolderOpen, Box, FileBox, LayoutGrid, List, Grid } from 'lucide-react';
 import Viewer from './components/Viewer';
+import ThumbnailGenerator from './components/ThumbnailGenerator';
+import localforage from 'localforage';
+import { ErrorBoundary } from 'react-error-boundary';
 
 function App() {
   const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
+  
+  const [thumbnails, setThumbnails] = useState({});
+  const [thumbnailQueue, setThumbnailQueue] = useState([]);
 
   // Helper to scan directory recursively
   const scanDirectory = async (dirHandle, path = '') => {
     let foundFiles = [];
     const supportedExtensions = ['glb', 'gltf', 'fbx', 'obj', 'stl'];
     
-    // We use dirHandle.values() which is an async iterable
     for await (const entry of dirHandle.values()) {
       if (entry.kind === 'file') {
         const ext = entry.name.split('.').pop().toLowerCase();
@@ -26,7 +32,6 @@ function App() {
           });
         }
       } else if (entry.kind === 'directory') {
-        // Recursively read subdirectories
         const subFiles = await scanDirectory(entry, path + entry.name + '/');
         foundFiles.push(...subFiles);
       }
@@ -47,11 +52,23 @@ function App() {
       setActiveFile(null);
       
       const foundFiles = await scanDirectory(dirHandle);
-      
-      // Sort alphabetically
       foundFiles.sort((a, b) => a.name.localeCompare(b.name));
       
       setFiles(foundFiles);
+      
+      // Load cached thumbnails or start generator queue
+      const cached = {};
+      const queue = [];
+      for (const f of foundFiles) {
+        const data = await localforage.getItem(`thumb_${f.path}`);
+        if (data) {
+          cached[f.path] = data;
+        } else {
+          queue.push(f);
+        }
+      }
+      setThumbnails(cached);
+      setThumbnailQueue(queue);
       setIsScanning(false);
     } catch (err) {
       setIsScanning(false);
@@ -64,7 +81,6 @@ function App() {
 
   const handleFileClick = async (fileInfo) => {
     try {
-      // Clean up previous URL to avoid memory leaks
       if (activeFile && activeFile.url) {
         URL.revokeObjectURL(activeFile.url);
       }
@@ -83,43 +99,107 @@ function App() {
     }
   };
 
+  const currentThumbnailFile = thumbnailQueue[0];
+  const handleThumbnailComplete = async (path, dataUrl) => {
+    if (dataUrl) {
+      await localforage.setItem(`thumb_${path}`, dataUrl);
+      setThumbnails(prev => ({ ...prev, [path]: dataUrl }));
+    }
+    setThumbnailQueue(prev => prev.slice(1));
+  };
+
   return (
     <div className="app-container">
+      {/* Background worker that strictly processes one thumbnail at a time */}
+      {currentThumbnailFile && (
+        <ErrorBoundary fallback={null} onError={() => handleThumbnailComplete(currentThumbnailFile.path, null)}>
+          <ThumbnailGenerator 
+            key={currentThumbnailFile.path} 
+            file={currentThumbnailFile} 
+            onComplete={handleThumbnailComplete} 
+          />
+        </ErrorBoundary>
+      )}
+
       {/* Sidebar */}
-      <aside className="sidebar glass-panel">
+      <aside className={`sidebar glass-panel ${!activeFile ? 'full-width' : ''}`}>
         <div className="sidebar-header">
-          <div className="logo-area">
+          <div className="logo-area" style={{ marginBottom: 0 }}>
             <LayoutGrid size={24} color="#a855f7" />
             <span>3D Explorer</span>
           </div>
-          <button 
-            className="btn" 
-            onClick={handleOpenDirectory}
-            disabled={isScanning}
-            style={{ width: '100%', justifyContent: 'center' }}
-          >
-            <FolderOpen size={18} />
-            {isScanning ? 'Scanning...' : 'Open Folder'}
-          </button>
+          
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className="btn" 
+              onClick={handleOpenDirectory}
+              disabled={isScanning}
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              <FolderOpen size={18} />
+              {isScanning ? 'Scan...' : 'Open'}
+            </button>
+            <div className="view-toggles">
+              <button 
+                className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List View"
+              >
+                <List size={18} />
+              </button>
+              <button 
+                className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid View"
+              >
+                <Grid size={18} />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="file-list">
+        <div className={`file-list ${viewMode === 'grid' ? 'grid-view' : ''}`}>
           {files.length === 0 && !isScanning ? (
-            <div className="empty-state">
+            <div className="empty-state" style={viewMode === 'grid' ? { gridColumn: '1 / -1' } : {}}>
               <FileBox size={48} strokeWidth={1} />
               <p>No 3D models selected.<br/>Open a folder to start.</p>
             </div>
           ) : (
-            files.map((file, idx) => (
-              <div 
-                key={idx}
-                className={`file-item ${activeFile?.path === file.path ? 'active' : ''}`}
-                onClick={() => handleFileClick(file)}
-              >
-                <Box size={18} className="file-icon" />
-                <span className="file-name" title={file.path}>{file.name}</span>
-              </div>
-            ))
+            files.map((file, idx) => {
+              const isActive = activeFile?.path === file.path;
+              const hasThumb = thumbnails[file.path];
+
+              if (viewMode === 'list') {
+                return (
+                  <div 
+                    key={idx}
+                    className={`file-item ${isActive ? 'active' : ''}`}
+                    onClick={() => handleFileClick(file)}
+                  >
+                    <Box size={18} className="file-icon" />
+                    <span className="file-name" title={file.name}>{file.name}</span>
+                  </div>
+                );
+              }
+
+              return (
+                <div 
+                  key={idx}
+                  className={`file-item grid-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handleFileClick(file)}
+                  title={file.name}
+                >
+                  <div className="thumbnail-container">
+                    {hasThumb ? (
+                      <img src={hasThumb} className="thumbnail-image" alt={file.name} loading="lazy" />
+                    ) : (
+                      <Box size={32} className="file-icon" style={{ opacity: 0.5 }} />
+                    )}
+                  </div>
+                  <span className="file-name">{file.name}</span>
+                </div>
+              );
+            })
           )}
         </div>
       </aside>
@@ -131,7 +211,7 @@ function App() {
             <div className="viewer-header glass">
               <div className="file-info">
                 <div>
-                  <h2 className="file-title">{activeFile.name}</h2>
+                  <h2 className="file-title" title={activeFile.name}>{activeFile.name}</h2>
                   <span className="file-size">{activeFile.size} • {activeFile.extension.toUpperCase()} Format</span>
                 </div>
               </div>

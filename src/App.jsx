@@ -3,6 +3,7 @@ import './App.css';
 import { FolderOpen, Box, FileBox, LayoutGrid, List, Grid } from 'lucide-react';
 import Viewer from './components/Viewer';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
+import SplashOverlay from './components/SplashOverlay';
 import localforage from 'localforage';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -11,6 +12,9 @@ function App() {
   const [activeFile, setActiveFile] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
+  const [showSplash, setShowSplash] = useState(() => {
+    return localStorage.getItem('hasSeenSplash') !== 'true';
+  });
   
   const [thumbnails, setThumbnails] = useState({});
   const [thumbnailQueue, setThumbnailQueue] = useState([]);
@@ -110,6 +114,12 @@ function App() {
 
   return (
     <div className="app-container">
+      {showSplash && (
+        <SplashOverlay onDismiss={() => {
+          setShowSplash(false);
+          localStorage.setItem('hasSeenSplash', 'true');
+        }} />
+      )}
       {/* Background worker that strictly processes one thumbnail at a time */}
       {currentThumbnailFile && (
         <ErrorBoundary fallback={null} onError={() => handleThumbnailComplete(currentThumbnailFile.path, null)}>

@@ -141,11 +141,87 @@
   color: rgba(255, 255, 255, 0.5);
   text-align: center;
   padding: 20px;
+  gap: 8px;
 }
 
 .empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
+  margin-bottom: 8px;
+  opacity: 0.4;
+}
+
+.empty-state h2 {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Drop overlay */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(99, 102, 241, 0.12);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: fadeIn 0.15s ease;
+  border: 3px dashed rgba(168, 85, 247, 0.6);
+}
+
+.drop-overlay-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 64px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 60px rgba(168, 85, 247, 0.25);
+  color: white;
+}
+
+.drop-overlay-inner svg {
+  color: #a855f7;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.95); }
+}
+
+.drop-overlay-inner h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.drop-overlay-inner p {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+/* File count badge */
+.file-count-badge {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 4px 16px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .main-content {
@@ -233,10 +309,26 @@
 
 .view-toggles {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   background: rgba(0, 0, 0, 0.2);
   padding: 4px;
   border-radius: 8px;
+}
+
+/* Secondary button (open single file) */
+.btn.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  gap: 6px;
+  flex-shrink: 0;
+  box-shadow: none;
+  padding: 10px 14px;
+}
+
+.btn.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
 .toggle-btn {

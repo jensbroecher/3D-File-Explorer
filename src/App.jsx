@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
-import { FolderOpen, Box, FileBox, LayoutGrid, List, Grid, File, Upload } from 'lucide-react';
+import { FolderOpen, Box, FileBox, LayoutGrid, List, Grid, File, Upload, X } from 'lucide-react';
 import Viewer from './components/Viewer';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import SplashOverlay from './components/SplashOverlay';
@@ -514,6 +514,16 @@ function App() {
                   </span>
                 </div>
               </div>
+              <button
+                className="close-btn"
+                onClick={() => {
+                  if (activeFile?.url) URL.revokeObjectURL(activeFile.url);
+                  setActiveFile(null);
+                }}
+                title="Close viewer"
+              >
+                <X size={20} />
+              </button>
             </div>
             <Viewer file={activeFile} />
           </>

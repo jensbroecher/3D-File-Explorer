@@ -79,7 +79,7 @@ export default function ThumbnailGenerator({ file, onComplete }) {
         const objUrl = URL.createObjectURL(fileObj);
         if (active) setUrl(objUrl);
       } catch (err) {
-        onComplete(file.path, null);
+        onComplete(file, null);
       }
     };
     gen();
@@ -92,7 +92,7 @@ export default function ThumbnailGenerator({ file, onComplete }) {
   if (!url) return null;
 
   const handleCapture = (dataUrl) => {
-    onComplete(file.path, dataUrl);
+    onComplete(file, dataUrl);
   };
 
   return (

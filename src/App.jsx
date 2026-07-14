@@ -10,6 +10,12 @@ import { ErrorBoundary } from 'react-error-boundary';
 const SUPPORTED_EXTENSIONS = ['glb', 'gltf', 'fbx', 'obj', 'stl'];
 const CACHE_BATCH_SIZE = 20; // load cache in small chunks to avoid freezing
 
+const getThumbnailCacheKey = (file) => {
+  const size = file.sizeBytes || 0;
+  const mtime = file.lastModified || 0;
+  return `thumb_v3_${file.path}_${size}_${mtime}`;
+};
+
 function App() {
   const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
@@ -33,7 +39,23 @@ function App() {
       if (entry.kind === 'file') {
         const ext = entry.name.split('.').pop().toLowerCase();
         if (SUPPORTED_EXTENSIONS.includes(ext)) {
-          foundFiles.push({ name: entry.name, path: path + entry.name, handle: entry, extension: ext });
+          let lastModified = 0;
+          let sizeBytes = 0;
+          try {
+            const fileObj = await entry.getFile();
+            lastModified = fileObj.lastModified;
+            sizeBytes = fileObj.size;
+          } catch (err) {
+            console.error('Error getting file metadata:', err);
+          }
+          foundFiles.push({
+            name: entry.name,
+            path: path + entry.name,
+            handle: entry,
+            extension: ext,
+            lastModified,
+            sizeBytes,
+          });
         }
       } else if (entry.kind === 'directory') {
         const subFiles = await scanDirectory(entry, path + entry.name + '/');
@@ -55,7 +77,8 @@ function App() {
       await Promise.all(
         batch.map(async (f) => {
           try {
-            const data = await localforage.getItem(`thumb_${f.path}`);
+            const key = getThumbnailCacheKey(f);
+            const data = await localforage.getItem(key);
             if (data) cached[f.path] = data;
             else queue.push(f);
           } catch {
@@ -75,7 +98,11 @@ function App() {
   // Finalize a file list after scanning
   // ---------------------------------------------------------------------------
   const finalizeFiles = async (foundFiles) => {
-    foundFiles.sort((a, b) => a.name.localeCompare(b.name));
+    foundFiles.sort((a, b) => {
+      const dateDiff = (b.lastModified || 0) - (a.lastModified || 0);
+      if (dateDiff !== 0) return dateDiff;
+      return a.name.localeCompare(b.name);
+    });
     setFiles(foundFiles);
     setIsScanning(false);
     await loadThumbnailCache(foundFiles);
@@ -141,13 +168,36 @@ function App() {
         extension: ext,
         url,
         size: (fileObj.size / 1024 / 1024).toFixed(2) + ' MB',
+        lastModified: fileObj.lastModified,
+        sizeBytes: fileObj.size,
       };
       // Add to list if not already there
       setFiles((prev) => {
         const exists = prev.find((f) => f.path === fileInfo.path);
-        return exists ? prev : [fileInfo, ...prev];
+        if (exists) return prev;
+        const nextFiles = [fileInfo, ...prev];
+        nextFiles.sort((a, b) => {
+          const dateDiff = (b.lastModified || 0) - (a.lastModified || 0);
+          if (dateDiff !== 0) return dateDiff;
+          return a.name.localeCompare(b.name);
+        });
+        return nextFiles;
       });
       setActiveFile(fileInfo);
+
+      // Handle thumbnail caching for single file picker
+      try {
+        const key = getThumbnailCacheKey(fileInfo);
+        const cachedData = await localforage.getItem(key);
+        if (cachedData) {
+          setThumbnails((prev) => ({ ...prev, [fileInfo.path]: cachedData }));
+        } else {
+          setThumbnailQueue((prev) => [...prev, fileInfo]);
+        }
+      } catch (err) {
+        console.error('Error loading thumbnail cache:', err);
+        setThumbnailQueue((prev) => [...prev, fileInfo]);
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error(err);
@@ -203,6 +253,8 @@ function App() {
                 path: path + file.name,
                 handle: pseudoHandle,
                 extension: ext,
+                lastModified: file.lastModified,
+                sizeBytes: file.size,
               });
             }
             resolve();
@@ -287,10 +339,11 @@ function App() {
   // Thumbnail queue
   // ---------------------------------------------------------------------------
   const currentThumbnailFile = thumbnailQueue[0];
-  const handleThumbnailComplete = async (path, dataUrl) => {
+  const handleThumbnailComplete = async (file, dataUrl) => {
     if (dataUrl) {
-      await localforage.setItem(`thumb_${path}`, dataUrl);
-      setThumbnails((prev) => ({ ...prev, [path]: dataUrl }));
+      const key = getThumbnailCacheKey(file);
+      await localforage.setItem(key, dataUrl);
+      setThumbnails((prev) => ({ ...prev, [file.path]: dataUrl }));
     }
     setThumbnailQueue((prev) => prev.slice(1));
   };
@@ -324,7 +377,7 @@ function App() {
       {currentThumbnailFile && (
         <ErrorBoundary
           fallback={null}
-          onError={() => handleThumbnailComplete(currentThumbnailFile.path, null)}
+          onError={() => handleThumbnailComplete(currentThumbnailFile, null)}
         >
           <ThumbnailGenerator
             key={currentThumbnailFile.path}
@@ -457,6 +510,7 @@ function App() {
                   </h2>
                   <span className="file-size">
                     {activeFile.size} • {activeFile.extension.toUpperCase()} Format
+                    {activeFile.lastModified ? ` • Modified: ${new Date(activeFile.lastModified).toLocaleString()}` : ''}
                   </span>
                 </div>
               </div>
